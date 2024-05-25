@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Code = require('../models/Code');
 const bcrypt = require('bcrypt');
 const sendEmail = require('../utils/sendEmail');
-const { where } = require('sequelize');
+const jwt = require('jsonwebtoken');
 
 const getAll = catchError(async(req, res) => {
     const results = await User.findAll();
@@ -83,11 +83,35 @@ const verifyUser = catchError(async(req, res) => {
     return res.json(user)
 })
 
+const login = catchError(async(req, res) => {
+    const { email, password } = req.body
+    const user = await User.findOne( { where: { email } } )
+    if (!user || !user.isVerified) return res.status(401).json({message: 'usuario no encontrado, o no verificado ://'})
+    
+    const validPassword = await bcrypt.compare(password, user.password)
+    if (!validPassword) return res.status(401).json({message: 'contraseña incorrecta :O'})
+
+    const token = jwt.sign(
+		{ user }, // payload
+		process.env.TOKEN_SECRET, // clave secreta
+		{ expiresIn: '1d' } // OPCIONAL: Tiempo en el que expira el token
+    )
+
+    return res.status(202).json({user, token})
+})
+
+const getLoggedUser = catchError(async(req, res) => {
+    const user = req.user
+    return res.status(200).json(user)
+})
+
 module.exports = {
     getAll,
     create,
     getOne,
     remove,
     update,
-    verifyUser
+    verifyUser,
+    login,
+    getLoggedUser
 }
